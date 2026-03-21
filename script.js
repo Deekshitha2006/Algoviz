@@ -456,7 +456,8 @@ function sizeCGCanvas(){
 }
 
 function cgTool(t){
-  cgTool_=t;cgSrc=null;
+  cgTool_=t;
+  // NOTE: do NOT reset cgSrc here — only reset on explicit cancel (Esc)
   document.getElementById("btnNode").classList.toggle("on",t==="node");
   document.getElementById("btnEdge").classList.toggle("on",t==="edge");
   const cv=document.getElementById("cgCanvas");
@@ -503,6 +504,44 @@ function editEdgeWeight(e){
   }
   log(`✏️ Edge <b>${lbl}</b> → weight = <b>${w}</b> (updated ${count} edge${count>1?'s':''})`);
   drawCG();
+}
+
+// ── EDGE CONNECTION HELPER ──
+// Centralised so both mouse and touch use identical logic.
+// Returns true if an edge was created, false otherwise.
+function handleEdgeClick(hitId){
+  if(!cgSrc){
+    // First click — select source node
+    cgSrc=hitId;
+    drawCG();
+    return false;
+  }
+  if(hitId===cgSrc){
+    // Clicked same node — deselect
+    cgSrc=null;
+    drawCG();
+    return false;
+  }
+  // Second click — create edge
+  const dir=document.getElementById("dirCk")?.checked;
+  let weight=1;
+  if(algo==="ucs"){
+    const raw=prompt("Edge weight (leave blank for 1):",1);
+    if(raw===null){
+      // user cancelled prompt — keep cgSrc so they can try again
+      return false;
+    }
+    const w=parseFloat(raw)||1;
+    weight=isNaN(w)||w<=0?1:w;
+  }
+  cgEdges.push({from:cgSrc,to:hitId,weight});
+  if(!dir)cgEdges.push({from:hitId,to:cgSrc,weight});
+  const srcLabel=cgNodes.find(n=>n.id===cgSrc)?.label||"?";
+  const dstLabel=cgNodes.find(n=>n.id===hitId)?.label||"?";
+  log(`🔗 Edge <b>${srcLabel} → ${dstLabel}</b>${weight!==1?" (w="+weight+")":""}`);
+  cgSrc=null;
+  drawCG();
+  return true;
 }
 
 function drawCG(){
@@ -558,14 +597,11 @@ function drawArrowCG(ctx,x1,y1,x2,y2){
 }
 
 // ══════════════════════════════════════
-// MOUSE / TOUCH  ← FIXED SECTION
+// MOUSE / TOUCH
 // ══════════════════════════════════════
 function cgPt(e){const r=document.getElementById("cgCanvas").getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};}
 
-// Long-press timer for mobile context menu
 let _longPressTimer=null;
-// Swallows the one synthetic "click" that fires right after a long-press touchend,
-// which would otherwise immediately close the context menu we just opened.
 let _swallowNextClick=false;
 
 document.addEventListener("DOMContentLoaded",()=>{
@@ -573,21 +609,30 @@ document.addEventListener("DOMContentLoaded",()=>{
 
   // ── MOUSE DOWN ──
   cv.addEventListener("mousedown",e=>{
-    if(e.button===2)return;
-    const{x,y}=cgPt(e),hit=nodeAt(x,y);
+    if(e.button!==0)return; // left click only
+    const{x,y}=cgPt(e);
+    const hit=nodeAt(x,y);
+
     if(cgTool_==="node"){
-      if(hit){cgDrag=hit;cgDX=x-hit.x;cgDY=y-hit.y;cv.classList.add("tool-drag");}
-      else{cgNodes.push({id:cgID(),label:nextLabel(),x,y,cost:null});drawCG();}
+      if(hit){
+        // drag
+        cgDrag=hit;cgDX=x-hit.x;cgDY=y-hit.y;
+        cv.classList.add("tool-drag");
+      } else {
+        // place new node
+        cgNodes.push({id:cgID(),label:nextLabel(),x,y,cost:null});
+        drawCG();
+      }
     } else {
-      if(!hit){const eHit=edgeAt(x,y);if(eHit){editEdgeWeight(eHit);}return;}
-      if(!cgSrc){cgSrc=hit.id;drawCG();}
-      else if(hit.id!==cgSrc){
-        const dir=document.getElementById("dirCk")?.checked;
-        const w=algo==="ucs"?parseFloat(prompt("Edge weight (leave blank for 1):",1)||1):1;
-        const weight=isNaN(w)||w<=0?1:w;
-        cgEdges.push({from:cgSrc,to:hit.id,weight});
-        if(!dir)cgEdges.push({from:hit.id,to:cgSrc,weight});
-        cgSrc=null;drawCG();
+      // ── EDGE TOOL ──
+      if(hit){
+        // clicked a node — delegate to central handler
+        handleEdgeClick(hit.id);
+      } else {
+        // clicked empty space — check for edge weight edit
+        const eHit=edgeAt(x,y);
+        if(eHit) editEdgeWeight(eHit);
+        // do NOT reset cgSrc when clicking empty space
       }
     }
   });
@@ -595,17 +640,21 @@ document.addEventListener("DOMContentLoaded",()=>{
   // ── MOUSE MOVE ──
   cv.addEventListener("mousemove",e=>{
     if(!cgDrag)return;
-    const{x,y}=cgPt(e);cgDrag.x=x-cgDX;cgDrag.y=y-cgDY;drawCG();
+    const{x,y}=cgPt(e);
+    cgDrag.x=x-cgDX;cgDrag.y=y-cgDY;
+    drawCG();
   });
 
   // ── MOUSE UP ──
   cv.addEventListener("mouseup",()=>{
-    cgDrag=null;
-    cv.classList.remove("tool-drag");
-    cv.classList.add(cgTool_==="node"?"tool-node":"tool-edge");
+    if(cgDrag){
+      cgDrag=null;
+      cv.classList.remove("tool-drag");
+      cv.classList.add(cgTool_==="node"?"tool-node":"tool-edge");
+    }
   });
 
-  // ── RIGHT CLICK — desktop context menu ──
+  // ── RIGHT CLICK (desktop context menu) ──
   cv.addEventListener("contextmenu",e=>{
     e.preventDefault();
     const{x,y}=cgPt(e),hit=nodeAt(x,y);
@@ -613,8 +662,12 @@ document.addEventListener("DOMContentLoaded",()=>{
       cgCtxId=hit.id;
       const m=document.getElementById("ctx");
       m.classList.remove("hide");
-      m.style.left=e.clientX+"px";
-      m.style.top =e.clientY+"px";
+      // keep menu on screen
+      const mw=160,mh=100;
+      const left=Math.min(e.clientX,window.innerWidth-mw-8);
+      const top =Math.min(e.clientY,window.innerHeight-mh-8);
+      m.style.left=left+"px";
+      m.style.top =top+"px";
     }
   });
 
@@ -623,45 +676,45 @@ document.addEventListener("DOMContentLoaded",()=>{
     e.preventDefault();
     const t=e.touches[0];
     const rect=cv.getBoundingClientRect();
-    const x=t.clientX-rect.left, y=t.clientY-rect.top;
+    const x=t.clientX-rect.left,y=t.clientY-rect.top;
     const hit=nodeAt(x,y);
 
-    // Start 500 ms long-press timer → opens context menu
+    // Long-press → context menu
     _longPressTimer=setTimeout(()=>{
       _longPressTimer=null;
       if(hit){
         cgCtxId=hit.id;
         const m=document.getElementById("ctx");
         m.classList.remove("hide");
-        // Position above the finger so thumb doesn't cover menu
-        m.style.left=(t.clientX+10)+"px";
-        m.style.top =(t.clientY-60)+"px";
-        // After touchend the browser fires a synthetic click ~300 ms later.
-        // That click would hit the global handler and immediately close the menu.
-        // Set flag so we swallow exactly that one click.
+        const mw=160,mh=100;
+        const left=Math.min(t.clientX+10,window.innerWidth-mw-8);
+        const top =Math.max(8,Math.min(t.clientY-60,window.innerHeight-mh-8));
+        m.style.left=left+"px";
+        m.style.top =top+"px";
         _swallowNextClick=true;
       }
     },500);
 
-    // Normal tap/drag behaviour
     if(cgTool_==="node"){
-      if(hit){cgDrag=hit;cgDX=x-hit.x;cgDY=y-hit.y;}
-      else{cgNodes.push({id:cgID(),label:nextLabel(),x,y,cost:null});drawCG();}
+      if(hit){
+        cgDrag=hit;cgDX=x-hit.x;cgDY=y-hit.y;
+      } else {
+        cgNodes.push({id:cgID(),label:nextLabel(),x,y,cost:null});
+        drawCG();
+      }
     } else {
-      if(!hit){const eHit=edgeAt(x,y);if(eHit){editEdgeWeight(eHit);}return;}
-      if(!cgSrc){cgSrc=hit.id;drawCG();}
-      else if(hit.id!==cgSrc){
-        const dir=document.getElementById("dirCk")?.checked;
-        const w=algo==="ucs"?parseFloat(prompt("Edge weight (leave blank for 1):",1)||1):1;
-        const weight=isNaN(w)||w<=0?1:w;
-        cgEdges.push({from:cgSrc,to:hit.id,weight});
-        if(!dir)cgEdges.push({from:hit.id,to:cgSrc,weight});
-        cgSrc=null;drawCG();
+      // ── EDGE TOOL (touch) ──
+      if(hit){
+        handleEdgeClick(hit.id);
+      } else {
+        const eHit=edgeAt(x,y);
+        if(eHit) editEdgeWeight(eHit);
+        // do NOT reset cgSrc
       }
     }
   },{passive:false});
 
-  // ── TOUCH MOVE — any movement cancels the long-press ──
+  // ── TOUCH MOVE ──
   cv.addEventListener("touchmove",e=>{
     e.preventDefault();
     if(_longPressTimer){clearTimeout(_longPressTimer);_longPressTimer=null;}
@@ -673,21 +726,15 @@ document.addEventListener("DOMContentLoaded",()=>{
     drawCG();
   },{passive:false});
 
-  // ── TOUCH END — quick lift also cancels long-press ──
+  // ── TOUCH END ──
   cv.addEventListener("touchend",()=>{
     if(_longPressTimer){clearTimeout(_longPressTimer);_longPressTimer=null;}
     cgDrag=null;
   });
 
-  // ── GLOBAL CLICK HANDLER ──
-  // Closes the context menu when the user taps outside it.
-  // Also swallows exactly one synthetic click that fires after a long-press
-  // touchend — without this the menu would close immediately after opening.
+  // ── GLOBAL CLICK — close context menu ──
   document.addEventListener("click",e=>{
-    if(_swallowNextClick){
-      _swallowNextClick=false;
-      return; // eat this click, keep the menu open
-    }
+    if(_swallowNextClick){_swallowNextClick=false;return;}
     const menu=document.getElementById("ctx");
     if(!menu.classList.contains("hide")&&!menu.contains(e.target)){
       menu.classList.add("hide");
@@ -744,7 +791,13 @@ function buildFromText(){
   log(`🟢 Start=<b>${cgNodes.find(n=>n.id===cgStart)?.label}</b>  🔴 Goal=<b>${cgNodes.find(n=>n.id===cgGoal)?.label}</b>`);
 }
 
-function cgClear(){cgNodes=[];cgEdges=[];cgStart=null;cgGoal=null;cgVis=new Set();cgCur=null;cgPath=new Set();cgIdN=0;document.getElementById("cg-summary").classList.add("hide");clearLog();drawCG();}
+function cgClear(){
+  cgNodes=[];cgEdges=[];cgStart=null;cgGoal=null;
+  cgVis=new Set();cgCur=null;cgPath=new Set();cgIdN=0;
+  cgSrc=null; // also clear any pending edge source
+  document.getElementById("cg-summary").classList.add("hide");
+  clearLog();drawCG();
+}
 
 // CG PAUSE/STEP
 function setCGBtns(r){cgRunning=r;document.getElementById("bGPause").disabled=!r;document.getElementById("bGStep").disabled=!r;}
@@ -880,7 +933,7 @@ function buildDemos(){
 function gridToCustomGraph(){
   if(!gridArr){log("⚠️ Create a grid first!");return;}
   cgNodes=[];cgEdges=[];cgStart=null;cgGoal=null;
-  cgVis=new Set();cgCur=null;cgPath=new Set();cgIdN=0;
+  cgVis=new Set();cgCur=null;cgPath=new Set();cgIdN=0;cgSrc=null;
   setMode('graph');
   setTimeout(()=>{
     const cv=document.getElementById("cgCanvas");
@@ -956,9 +1009,9 @@ function fabExport(){gridToCustomGraph();kbdToast("⬡ Exported to graph");}
 let panelOpen=true;
 function togglePanel(){
   panelOpen=!panelOpen;
-  const wrap =document.getElementById("panel-wrap");
+  const wrap=document.getElementById("panel-wrap");
   const arrow=document.getElementById("panel-toggle-arrow");
-  const hint =document.getElementById("panel-toggle-hint");
+  const hint=document.getElementById("panel-toggle-hint");
   if(panelOpen){wrap.classList.remove("collapsed");arrow.classList.add("up");arrow.textContent="▲";hint.textContent="tap to collapse";}
   else{wrap.classList.add("collapsed");arrow.classList.remove("up");arrow.textContent="▼";hint.textContent="tap to expand";}
 }
