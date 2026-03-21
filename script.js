@@ -1067,43 +1067,4 @@ window.addEventListener("DOMContentLoaded",()=>{
   showGridHint();
   // size canvas once layout is done
   setTimeout(()=>{sizeCGCanvas();},200);
-  let touchTimer = null;
-
-cv.addEventListener("touchstart", (e) => {
-  const t = e.touches[0];
-  const r = cv.getBoundingClientRect();
-  const x = t.clientX - r.left;
-  const y = t.clientY - r.top;
-
-  const hit = nodeAt(x, y);
-
-  if (!hit) return;
-
-  touchTimer = setTimeout(() => {
-    // simulate right click menu
-    cgCtxId = hit.id;
-
-    const m = document.getElementById("ctx");
-    m.classList.remove("hide");
-    m.style.left = t.clientX + "px";
-    m.style.top = t.clientY + "px";
-  }, 600); // long press
-}, { passive: false });
-
-cv.addEventListener("touchend", () => {
-  clearTimeout(touchTimer);
 });
-
-cv.addEventListener("touchmove", () => {
-  clearTimeout(touchTimer);
-});
-});
-let mode = "start"; // or "goal"
-
-function handleClick(node) {
-  if (mode === "start") {
-    setStart(node);
-  } else if (mode === "goal") {
-    setGoal(node);
-  }
-}
