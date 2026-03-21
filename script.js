@@ -1068,3 +1068,12 @@ window.addEventListener("DOMContentLoaded",()=>{
   // size canvas once layout is done
   setTimeout(()=>{sizeCGCanvas();},200);
 });
+let mode = "start"; // or "goal"
+
+function handleClick(node) {
+  if (mode === "start") {
+    setStart(node);
+  } else if (mode === "goal") {
+    setGoal(node);
+  }
+}
