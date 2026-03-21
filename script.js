@@ -164,7 +164,7 @@ function setMode(m){
     showGridHint();
   } else {
     showGraphHint();
-    displayCode(); // refresh code panel for current algo
+    displayCode();
     sizeCGCanvas();
     drawCG();
   }
@@ -184,7 +184,7 @@ function showGridHint(){
     <div class="step" id="s4"><span class="snum">4</span><span>Press <b>▶ Run</b></span></div>`;
 }
 function showGraphHint(){
-  document.getElementById("hintbar").innerHTML=`<span id="cg-hint-bar" style="color:var(--cyan);font-weight:600">🟢 Tool: Add Node — click canvas to place a node</span><span style="color:var(--text3);margin-left:14px;font-size:11px">Right-click node → Set Start / Goal / Delete</span>`;
+  document.getElementById("hintbar").innerHTML=`<span id="cg-hint-bar" style="color:var(--cyan);font-weight:600">🟢 Tool: Add Node — click canvas to place a node</span><span style="color:var(--text3);margin-left:14px;font-size:11px">Right-click / Long-press node → Set Start / Goal / Delete</span>`;
   updateCGHint();
 }
 function updateCGHint(){
@@ -249,7 +249,6 @@ function setStep(n){
 // GRID
 // ══════════════════════════════════════
 function cellSz(){
-  // On mobile, use viewport-based sizing; on desktop use fixed sizes
   const vw=window.innerWidth;
   if(vw<=640){
     const avail=Math.min(vw,640)-80;
@@ -264,15 +263,14 @@ function createGrid(){
   const g=document.getElementById("grid");
   g.innerHTML="";
   g.style.gridTemplateColumns=`repeat(${COLS},${cellSz()}px)`;
-  // Set CSS variable so mobile cells auto-size via calc()
   document.getElementById("grid-view").style.setProperty("--cols", COLS);
   gridArr=Array.from({length:ROWS},()=>Array(COLS).fill(0));
   startP=null;goalP=null;lastC=null;running=false;
   setBtns(false);
   document.getElementById("grid-summary").classList.add("hide");
   setStep(1);clearLog();
-  const ggc=document.getElementById("ggCanvas");
-  ggc.getContext("2d").clearRect(0,0,ggc.width,ggc.height);
+  const ggcv=document.getElementById("ggCanvas");
+  ggcv.getContext("2d").clearRect(0,0,ggcv.width,ggcv.height);
   for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
     const cell=document.createElement("div");
     cell.classList.add("cell");
@@ -359,7 +357,6 @@ function computeSteps(){
     }
   }
 
-  // finish
   if(found){
     let cur=K(...goalP);const sk=K(...startP);const path=[];let s=0;
     while(cur&&cur!==sk&&s++<ROWS*COLS){path.unshift(cur);cur=par[cur];}
@@ -453,7 +450,6 @@ function runGG(){
 function sizeCGCanvas(){
   const gv=document.getElementById("graph-view");
   const cv=document.getElementById("cgCanvas");
-  // Use offsetWidth/offsetHeight — works even if element was just shown
   const w=gv.offsetWidth||600;
   const h=Math.max(gv.offsetHeight-60,300)||400;
   cv.width=w; cv.height=h;
@@ -472,15 +468,13 @@ function cgTool(t){
 function nodeAt(x,y){return cgNodes.find(n=>Math.hypot(n.x-x,n.y-y)<26);}
 
 function edgeAt(x,y){
-  // Build a deduplicated list of unique edges (avoid A→B and B→A both matching)
-  // Use canonical key: smaller id always first
   const seen=new Set();
   const unique=[];
   for(const e of cgEdges){
     const key=[e.from,e.to].sort().join("|");
     if(!seen.has(key)){seen.add(key);unique.push(e);}
   }
-  let best=null, bestDist=14; // max 14px from edge line
+  let best=null,bestDist=14;
   for(const e of unique){
     const a=cgNodes.find(n=>n.id===e.from),b=cgNodes.find(n=>n.id===e.to);
     if(!a||!b)continue;
@@ -497,16 +491,15 @@ function edgeAt(x,y){
 function editEdgeWeight(e){
   const a=cgNodes.find(n=>n.id===e.from),b=cgNodes.find(n=>n.id===e.to);
   const lbl=(a?.label||"?")+"–"+(b?.label||"?");
-  const val=prompt("Set weight for edge "+lbl+"\nCurrent: "+e.weight+"\n\nEnter new weight (positive number):", e.weight);
-  if(val===null||val.trim()==="")return; // cancelled
+  const val=prompt("Set weight for edge "+lbl+"\nCurrent: "+e.weight+"\n\nEnter new weight (positive number):",e.weight);
+  if(val===null||val.trim()==="")return;
   const w=parseFloat(val);
   if(isNaN(w)||w<=0){alert("Enter a valid positive number (e.g. 3 or 2.5)");return;}
-  // Update BOTH directions (undirected: A→B and B→A share the same weight)
   let count=0;
   for(const ed of cgEdges){
-    const sameDir = ed.from===e.from && ed.to===e.to;
-    const revDir  = ed.from===e.to   && ed.to===e.from;
-    if(sameDir||revDir){ ed.weight=w; count++; }
+    const sameDir=ed.from===e.from&&ed.to===e.to;
+    const revDir =ed.from===e.to  &&ed.to===e.from;
+    if(sameDir||revDir){ed.weight=w;count++;}
   }
   log(`✏️ Edge <b>${lbl}</b> → weight = <b>${w}</b> (updated ${count} edge${count>1?'s':''})`);
   drawCG();
@@ -518,10 +511,8 @@ function drawCG(){
   const ctx=cv.getContext("2d");
   const w=cv.width,h=cv.height;
   ctx.clearRect(0,0,w,h);
-  // dot grid
   ctx.fillStyle="rgba(255,255,255,0.025)";
   for(let x=25;x<w;x+=32)for(let y=25;y<h;y+=32){ctx.beginPath();ctx.arc(x,y,1,0,Math.PI*2);ctx.fill();}
-  // edges
   const col=ALGOS[algo].color;
   for(const e of cgEdges){
     const a=cgNodes.find(n=>n.id===e.from),b=cgNodes.find(n=>n.id===e.to);
@@ -529,17 +520,14 @@ function drawCG(){
     const inP=cgPath.has(e.from)&&cgPath.has(e.to);
     ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
     ctx.strokeStyle=inP?"#a78bfa":"rgba(255,255,255,0.15)";ctx.lineWidth=inP?2.5:1.5;ctx.stroke();
-    // Always show weight for UCS; only show if !=1 for others
     const showW=(algo==="ucs")||e.weight!==1;
     if(showW&&e.weight){
       const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
-      // small background pill
       ctx.fillStyle="rgba(253,230,138,0.15)";ctx.beginPath();ctx.roundRect(mx-12,my-16,24,14,4);ctx.fill();
       ctx.fillStyle="#fde68a";ctx.font="bold 10px monospace";ctx.textAlign="center";ctx.fillText(e.weight,mx,my-6);
     }
     if(document.getElementById("dirCk")?.checked)drawArrowCG(ctx,a.x,a.y,b.x,b.y);
   }
-  // nodes
   const R=22;
   for(const nd of cgNodes){
     const iS=nd.id===cgStart,iG=nd.id===cgGoal,iC=nd.id===cgCur;
@@ -569,24 +557,29 @@ function drawArrowCG(ctx,x1,y1,x2,y2){
   ctx.fillStyle="rgba(255,255,255,0.35)";ctx.fill();
 }
 
-// MOUSE / TOUCH
+// ══════════════════════════════════════
+// MOUSE / TOUCH  ← FIXED SECTION
+// ══════════════════════════════════════
 function cgPt(e){const r=document.getElementById("cgCanvas").getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};}
+
+// Long-press timer for mobile context menu
+let _longPressTimer=null;
+// Swallows the one synthetic "click" that fires right after a long-press touchend,
+// which would otherwise immediately close the context menu we just opened.
+let _swallowNextClick=false;
 
 document.addEventListener("DOMContentLoaded",()=>{
   const cv=document.getElementById("cgCanvas");
+
+  // ── MOUSE DOWN ──
   cv.addEventListener("mousedown",e=>{
     if(e.button===2)return;
     const{x,y}=cgPt(e),hit=nodeAt(x,y);
     if(cgTool_==="node"){
-      if(hit){cgDrag=hit;cgDX=x-hit.x;cgDY=y-hit.y;document.getElementById("cgCanvas").classList.add("tool-drag");}
+      if(hit){cgDrag=hit;cgDX=x-hit.x;cgDY=y-hit.y;cv.classList.add("tool-drag");}
       else{cgNodes.push({id:cgID(),label:nextLabel(),x,y,cost:null});drawCG();}
     } else {
-      if(!hit){
-        // Check if clicked on an existing edge to edit its weight
-        const eHit=edgeAt(x,y);
-        if(eHit){editEdgeWeight(eHit);}
-        return;
-      }
+      if(!hit){const eHit=edgeAt(x,y);if(eHit){editEdgeWeight(eHit);}return;}
       if(!cgSrc){cgSrc=hit.id;drawCG();}
       else if(hit.id!==cgSrc){
         const dir=document.getElementById("dirCk")?.checked;
@@ -598,20 +591,108 @@ document.addEventListener("DOMContentLoaded",()=>{
       }
     }
   });
+
+  // ── MOUSE MOVE ──
   cv.addEventListener("mousemove",e=>{
     if(!cgDrag)return;
     const{x,y}=cgPt(e);cgDrag.x=x-cgDX;cgDrag.y=y-cgDY;drawCG();
   });
-  cv.addEventListener("mouseup",()=>{cgDrag=null;const cv2=document.getElementById("cgCanvas");cv2.classList.remove("tool-drag");cv2.classList.add(cgTool_==="node"?"tool-node":"tool-edge");});
+
+  // ── MOUSE UP ──
+  cv.addEventListener("mouseup",()=>{
+    cgDrag=null;
+    cv.classList.remove("tool-drag");
+    cv.classList.add(cgTool_==="node"?"tool-node":"tool-edge");
+  });
+
+  // ── RIGHT CLICK — desktop context menu ──
   cv.addEventListener("contextmenu",e=>{
     e.preventDefault();
     const{x,y}=cgPt(e),hit=nodeAt(x,y);
-    if(hit){cgCtxId=hit.id;const m=document.getElementById("ctx");m.classList.remove("hide");m.style.left=e.clientX+"px";m.style.top=e.clientY+"px";}
+    if(hit){
+      cgCtxId=hit.id;
+      const m=document.getElementById("ctx");
+      m.classList.remove("hide");
+      m.style.left=e.clientX+"px";
+      m.style.top =e.clientY+"px";
+    }
   });
-  cv.addEventListener("touchstart",e=>{e.preventDefault();const t=e.touches[0],r=cv.getBoundingClientRect(),x=t.clientX-r.left,y=t.clientY-r.top,hit=nodeAt(x,y);if(cgTool_==="node"){if(hit){cgDrag=hit;cgDX=x-hit.x;cgDY=y-hit.y;}else{cgNodes.push({id:cgID(),label:nextLabel(),x,y,cost:null});drawCG();}}else if(hit){if(!cgSrc){cgSrc=hit.id;drawCG();}else if(hit.id!==cgSrc){cgEdges.push({from:cgSrc,to:hit.id,weight:1});if(!document.getElementById("dirCk")?.checked)cgEdges.push({from:hit.id,to:cgSrc,weight:1});cgSrc=null;drawCG();}}},{passive:false});
-  cv.addEventListener("touchmove",e=>{e.preventDefault();if(!cgDrag)return;const t=e.touches[0],r=cv.getBoundingClientRect();cgDrag.x=t.clientX-r.left-cgDX;cgDrag.y=t.clientY-r.top-cgDY;drawCG();},{passive:false});
-  cv.addEventListener("touchend",()=>cgDrag=null);
-  document.addEventListener("click",()=>document.getElementById("ctx").classList.add("hide"));
+
+  // ── TOUCH START ──
+  cv.addEventListener("touchstart",e=>{
+    e.preventDefault();
+    const t=e.touches[0];
+    const rect=cv.getBoundingClientRect();
+    const x=t.clientX-rect.left, y=t.clientY-rect.top;
+    const hit=nodeAt(x,y);
+
+    // Start 500 ms long-press timer → opens context menu
+    _longPressTimer=setTimeout(()=>{
+      _longPressTimer=null;
+      if(hit){
+        cgCtxId=hit.id;
+        const m=document.getElementById("ctx");
+        m.classList.remove("hide");
+        // Position above the finger so thumb doesn't cover menu
+        m.style.left=(t.clientX+10)+"px";
+        m.style.top =(t.clientY-60)+"px";
+        // After touchend the browser fires a synthetic click ~300 ms later.
+        // That click would hit the global handler and immediately close the menu.
+        // Set flag so we swallow exactly that one click.
+        _swallowNextClick=true;
+      }
+    },500);
+
+    // Normal tap/drag behaviour
+    if(cgTool_==="node"){
+      if(hit){cgDrag=hit;cgDX=x-hit.x;cgDY=y-hit.y;}
+      else{cgNodes.push({id:cgID(),label:nextLabel(),x,y,cost:null});drawCG();}
+    } else {
+      if(!hit){const eHit=edgeAt(x,y);if(eHit){editEdgeWeight(eHit);}return;}
+      if(!cgSrc){cgSrc=hit.id;drawCG();}
+      else if(hit.id!==cgSrc){
+        const dir=document.getElementById("dirCk")?.checked;
+        const w=algo==="ucs"?parseFloat(prompt("Edge weight (leave blank for 1):",1)||1):1;
+        const weight=isNaN(w)||w<=0?1:w;
+        cgEdges.push({from:cgSrc,to:hit.id,weight});
+        if(!dir)cgEdges.push({from:hit.id,to:cgSrc,weight});
+        cgSrc=null;drawCG();
+      }
+    }
+  },{passive:false});
+
+  // ── TOUCH MOVE — any movement cancels the long-press ──
+  cv.addEventListener("touchmove",e=>{
+    e.preventDefault();
+    if(_longPressTimer){clearTimeout(_longPressTimer);_longPressTimer=null;}
+    if(!cgDrag)return;
+    const t=e.touches[0];
+    const rect=cv.getBoundingClientRect();
+    cgDrag.x=t.clientX-rect.left-cgDX;
+    cgDrag.y=t.clientY-rect.top -cgDY;
+    drawCG();
+  },{passive:false});
+
+  // ── TOUCH END — quick lift also cancels long-press ──
+  cv.addEventListener("touchend",()=>{
+    if(_longPressTimer){clearTimeout(_longPressTimer);_longPressTimer=null;}
+    cgDrag=null;
+  });
+
+  // ── GLOBAL CLICK HANDLER ──
+  // Closes the context menu when the user taps outside it.
+  // Also swallows exactly one synthetic click that fires after a long-press
+  // touchend — without this the menu would close immediately after opening.
+  document.addEventListener("click",e=>{
+    if(_swallowNextClick){
+      _swallowNextClick=false;
+      return; // eat this click, keep the menu open
+    }
+    const menu=document.getElementById("ctx");
+    if(!menu.classList.contains("hide")&&!menu.contains(e.target)){
+      menu.classList.add("hide");
+    }
+  });
 });
 
 function nextLabel(){const idx=cgNodes.length;return idx<26?String.fromCharCode(65+idx):"N"+idx;}
@@ -621,8 +702,15 @@ function ctxDo(a){
   const nd=cgNodes.find(n=>n.id===cgCtxId);
   if(a==="start"){cgStart=cgCtxId;log(`🟢 <b>${nd?.label}</b> = Start`);}
   else if(a==="goal"){cgGoal=cgCtxId;log(`🔴 <b>${nd?.label}</b> = Goal`);}
-  else{cgNodes=cgNodes.filter(n=>n.id!==cgCtxId);cgEdges=cgEdges.filter(e=>e.from!==cgCtxId&&e.to!==cgCtxId);if(cgStart===cgCtxId)cgStart=null;if(cgGoal===cgCtxId)cgGoal=null;}
-  cgCtxId=null;drawCG();
+  else{
+    cgNodes=cgNodes.filter(n=>n.id!==cgCtxId);
+    cgEdges=cgEdges.filter(e=>e.from!==cgCtxId&&e.to!==cgCtxId);
+    if(cgStart===cgCtxId)cgStart=null;
+    if(cgGoal===cgCtxId)cgGoal=null;
+  }
+  cgCtxId=null;
+  document.getElementById("ctx").classList.add("hide");
+  drawCG();
 }
 
 // TYPE EDGES
@@ -666,20 +754,17 @@ function cgTick(ms){return new Promise(r=>{if(cgPaused){cgStepRes=r;}else setTim
 
 async function runCG(){
   if(cgNodes.length<2){log("⚠️ Need at least 2 nodes!");return;}
-  if(!cgStart){log("⚠️ Right-click a node → Set as Start");return;}
-  if(!cgGoal){log("⚠️ Right-click a node → Set as Goal");return;}
+  if(!cgStart){log("⚠️ Right-click / long-press a node → Set as Start");return;}
+  if(!cgGoal){log("⚠️ Right-click / long-press a node → Set as Goal");return;}
   if(cgRunning)return;
   cgVis=new Set();cgCur=null;cgPath=new Set();
   cgNodes.forEach(n=>n.cost=null);
   document.getElementById("cg-summary").classList.add("hide");
   setCGBtns(true);cgPaused=false;
   document.getElementById("bGPause").textContent="⏸ Pause";
-  clearLog();
-  // Refresh code panel so it shows current algorithm
-  displayCode();
+  clearLog();displayCode();
   const sL=cgNodes.find(n=>n.id===cgStart)?.label,gL=cgNodes.find(n=>n.id===cgGoal)?.label;
   log(`🚀 <b>${ALGOS[algo].name}</b>  Start:<b>${sL}</b> → Goal:<b>${gL}</b>`);
-  // build adj
   const adj={};for(const n of cgNodes)adj[n.id]=[];
   for(const e of cgEdges)if(adj[e.from])adj[e.from].push({id:e.to,w:e.weight||1});
   const par={};let vo=[],found=false;
@@ -692,7 +777,7 @@ async function runCG(){
       cgCur=id;cgVis.add(id);vo.push(id);hlLine(5);
       log(`🟡 <b>Visiting ${NL(id)}</b>`);showQ(q.map(id=>({label:NL(id)})),"Queue");drawCG();
       if(id===cgGoal){found=true;break;}
-      for(const nb of(adj[id]||[])){if(!vis.has(nb.id)){vis.has(nb.id);vis.add(nb.id);par[nb.id]=id;q.push(nb.id);log(`📥 → <b>${NL(nb.id)}</b>`);}}
+      for(const nb of(adj[id]||[])){if(!vis.has(nb.id)){vis.add(nb.id);par[nb.id]=id;q.push(nb.id);log(`📥 → <b>${NL(nb.id)}</b>`);}}
     }
   } else if(algo==="dfs"){
     const st=[{id:cgStart,p:null}],vis=new Set();
@@ -729,15 +814,14 @@ async function runCG(){
   } else if(algo==="iddfs"){
     const maxD=Math.min(cgNodes.length+2,15);
     for(let d=0;d<=maxD&&!found;d++){
-      hlLine(1); // "depth = 0 / depth += 1"
+      hlLine(1);
       log(`🔁 <b>IDDFS Round ${d}</b> — depth limit raised to <b>${d}</b>. Running DFS up to depth ${d}...`);
       showQ([{label:"limit="+d}],"Depth Limit");
-      // clear visit colours for new round so student sees the fresh DFS
-      cgVis=new Set(); cgNodes.forEach(n=>n.cost=null); drawCG(); await cgTick(500);
+      cgVis=new Set();cgNodes.forEach(n=>n.cost=null);drawCG();await cgTick(500);
       const rP={},pS=new Set();
       found=await cgDLS(cgStart,null,d,adj,rP,pS,vo,d);
       if(found)Object.assign(par,rP);
-      if(!found) log(`↩️ Round ${d} exhausted — no path within depth ${d}, increasing limit...`);
+      if(!found)log(`↩️ Round ${d} exhausted — no path within depth ${d}, increasing limit...`);
     }
   }
 
@@ -761,23 +845,20 @@ async function cgDLS(id,p,lim,adj,par,pS,vo,totalD){
   cgCur=id;cgVis.add(id);vo.push(id);
   const nd=cgNodes.find(n=>n.id===id);
   const curDepth=totalD-lim;
-  if(nd)nd.cost="d="+curDepth; // depth label on node
-  hlLine(8); // dls: "if node == goal: return True"
+  if(nd)nd.cost="d="+curDepth;
+  hlLine(8);
   log(`🔶 DFS <b>${nd?.label}</b> &nbsp;depth=${curDepth} &nbsp;remaining=${lim}`);
-  // show current path stack
   showQ([...pS].map(id=>({label:cgNodes.find(n=>n.id===id)?.label})),"Path Stack");
   drawCG();await cgTick(380);
   if(id===cgGoal)return true;
   if(lim===0){
-    hlLine(9); // dls: "if limit == 0: return False"
+    hlLine(9);
     log(`🛑 <b>${nd?.label}</b> — depth limit ${totalD} reached, backtracking`);
     if(nd)nd.cost=null;pS.delete(id);return false;
   }
-  hlLine(10); // dls: "for n in neighbors(node):"
-  for(const nb of(adj[id]||[])){
-    if(await cgDLS(nb.id,id,lim-1,adj,par,pS,vo,totalD))return true;
-  }
-  if(nd)nd.cost=null; // clear on backtrack
+  hlLine(10);
+  for(const nb of(adj[id]||[])){if(await cgDLS(nb.id,id,lim-1,adj,par,pS,vo,totalD))return true;}
+  if(nd)nd.cost=null;
   pS.delete(id);
   return false;
 }
@@ -798,176 +879,99 @@ function buildDemos(){
 // ══════════════════════════════════════
 function gridToCustomGraph(){
   if(!gridArr){log("⚠️ Create a grid first!");return;}
-
-  // Reset custom graph state
   cgNodes=[];cgEdges=[];cgStart=null;cgGoal=null;
   cgVis=new Set();cgCur=null;cgPath=new Set();cgIdN=0;
-
-  // Switch to graph mode first so canvas is visible and sized
   setMode('graph');
-
-  // After layout, build nodes from grid cells
   setTimeout(()=>{
     const cv=document.getElementById("cgCanvas");
-    const W=cv.width||600, H=cv.height||400;
-
-    // Calculate spacing to fit all nodes nicely
+    const W=cv.width||600,H=cv.height||400;
     const padding=40;
     const cellW=(W-padding*2)/Math.max(COLS-1,1);
     const cellH=(H-padding*2)/Math.max(ROWS-1,1);
-    const spacing=Math.min(cellW,cellH,60); // cap at 60px so graph isn't huge
-
-    // Center the graph on the canvas
-    const totalW=spacing*(COLS-1);
-    const totalH=spacing*(ROWS-1);
-    const offX=(W-totalW)/2;
-    const offY=(H-totalH)/2;
-
-    const nodeMap={}; // "r,c" → node id
-
-    // Create nodes for every non-wall cell
+    const spacing=Math.min(cellW,cellH,60);
+    const offX=(W-spacing*(COLS-1))/2;
+    const offY=(H-spacing*(ROWS-1))/2;
+    const nodeMap={};
     for(let r=0;r<ROWS;r++){
       for(let c=0;c<COLS;c++){
-        if(gridArr[r][c]===1)continue; // skip walls
+        if(gridArr[r][c]===1)continue;
         const id=cgID();
         const label=String.fromCharCode(65+(cgNodes.length%26))+(cgNodes.length>=26?Math.floor(cgNodes.length/26):"");
-        const x=offX+c*spacing;
-        const y=offY+r*spacing;
-        cgNodes.push({id,label,x,y,cost:null,gridR:r,gridC:c});
+        cgNodes.push({id,label,x:offX+c*spacing,y:offY+r*spacing,cost:null,gridR:r,gridC:c});
         nodeMap[r+","+c]=id;
       }
     }
-
-    // Create edges between adjacent non-wall cells
-    const seen=new Set();
     for(let r=0;r<ROWS;r++){
       for(let c=0;c<COLS;c++){
         if(gridArr[r][c]===1)continue;
         const fromId=nodeMap[r+","+c];
-        [[0,1],[1,0]].forEach(([dr,dc])=>{ // only right + down to avoid duplicates
+        [[0,1],[1,0]].forEach(([dr,dc])=>{
           const nr=r+dr,nc=c+dc;
           if(nr>=0&&nc>=0&&nr<ROWS&&nc<COLS&&gridArr[nr][nc]!==1){
             const toId=nodeMap[nr+","+nc];
             cgEdges.push({from:fromId,to:toId,weight:1});
-            cgEdges.push({from:toId,to:fromId,weight:1}); // undirected
+            cgEdges.push({from:toId,to:fromId,weight:1});
           }
         });
       }
     }
-
-    // Carry over start and goal
-    if(startP){
-      const sId=nodeMap[startP[0]+","+startP[1]];
-      if(sId){cgStart=sId;log(`🟢 Start node = <b>${cgNodes.find(n=>n.id===sId)?.label}</b>`);}
-    }
-    if(goalP){
-      const gId=nodeMap[goalP[0]+","+goalP[1]];
-      if(gId){cgGoal=gId;log(`🔴 Goal node = <b>${cgNodes.find(n=>n.id===gId)?.label}</b>`);}
-    }
-
+    if(startP){const sId=nodeMap[startP[0]+","+startP[1]];if(sId){cgStart=sId;log(`🟢 Start node = <b>${cgNodes.find(n=>n.id===sId)?.label}</b>`);}}
+    if(goalP){const gId=nodeMap[goalP[0]+","+goalP[1]];if(gId){cgGoal=gId;log(`🔴 Goal node = <b>${cgNodes.find(n=>n.id===gId)?.label}</b>`);}}
     drawCG();
     log(`✅ Grid exported: <b>${cgNodes.length} nodes</b>, <b>${cgEdges.length/2} edges</b>`);
-    log(`💡 Right-click any node to change Start/Goal. Click edges (⟶ Edge tool) to edit weights.`);
+    log(`💡 Long-press any node to change Start/Goal. Use ⟶ Edge tool to edit weights.`);
   },100);
 }
 
 // ══════════════════════════════════════
 // MOBILE FAB
 // ══════════════════════════════════════
-let fabOpen = false;
-
+let fabOpen=false;
 function toggleFAB(){
-  fabOpen = !fabOpen;
-  document.getElementById("fab-menu").classList.toggle("show", fabOpen);
-  document.getElementById("fab-backdrop").classList.toggle("show", fabOpen);
-  document.getElementById("fab").textContent = fabOpen ? "✕" : "⚡";
-  // Update dynamic labels
-  document.getElementById("fab-algo-name").textContent = ALGOS[algo]?.short || algo.toUpperCase();
-  document.getElementById("fab-mode-label").textContent = mode==="grid" ? "Custom Graph" : "Grid Mode";
-  document.getElementById("fab-mode-icon").textContent  = mode==="grid" ? "⬡" : "⊞";
-  document.getElementById("fab-panel-label").textContent = panelOpen ? "Collapse Panel" : "Expand Panel";
+  fabOpen=!fabOpen;
+  document.getElementById("fab-menu").classList.toggle("show",fabOpen);
+  document.getElementById("fab-backdrop").classList.toggle("show",fabOpen);
+  document.getElementById("fab").textContent=fabOpen?"✕":"⚡";
+  document.getElementById("fab-algo-name").textContent=ALGOS[algo]?.short||algo.toUpperCase();
+  document.getElementById("fab-mode-label").textContent=mode==="grid"?"Custom Graph":"Grid Mode";
+  document.getElementById("fab-mode-icon").textContent =mode==="grid"?"⬡":"⊞";
+  document.getElementById("fab-panel-label").textContent=panelOpen?"Collapse Panel":"Expand Panel";
 }
-
 function closeFAB(){
   fabOpen=false;
   document.getElementById("fab-menu").classList.remove("show");
   document.getElementById("fab-backdrop").classList.remove("show");
   document.getElementById("fab").textContent="⚡";
 }
-
-function fabRun(){
-  closeFAB();
-  if(mode==="grid") runGrid();
-  else runCG();
-  kbdToast("▶ Running "+ALGOS[algo].short);
-}
-
-function fabPause(){
-  closeFAB();
-  if(mode==="grid") togglePause();
-  else toggleCGPause();
-}
-
-function fabStep(){
-  closeFAB();
-  if(mode==="grid") doStep();
-  else doCGStep();
-  kbdToast("⏭ Step");
-}
-
-function fabToggleMode(){
-  closeFAB();
-  const next = mode==="grid" ? "graph" : "grid";
-  setMode(next);
-  kbdToast(next==="grid" ? "⊞ Grid mode" : "⬡ Custom Graph mode");
-}
-
-function fabNewGrid(){
-  createGrid();
-  kbdToast("🔲 New grid");
-}
-
-function fabExport(){
-  gridToCustomGraph();
-  kbdToast("⬡ Exported to graph");
-}
+function fabRun(){closeFAB();if(mode==="grid")runGrid();else runCG();kbdToast("▶ Running "+ALGOS[algo].short);}
+function fabPause(){closeFAB();if(mode==="grid")togglePause();else toggleCGPause();}
+function fabStep(){closeFAB();if(mode==="grid")doStep();else doCGStep();kbdToast("⏭ Step");}
+function fabToggleMode(){closeFAB();const next=mode==="grid"?"graph":"grid";setMode(next);kbdToast(next==="grid"?"⊞ Grid mode":"⬡ Custom Graph mode");}
+function fabNewGrid(){createGrid();kbdToast("🔲 New grid");}
+function fabExport(){gridToCustomGraph();kbdToast("⬡ Exported to graph");}
 
 // ══════════════════════════════════════
 // PANEL TOGGLE
 // ══════════════════════════════════════
-let panelOpen = true;
-
+let panelOpen=true;
 function togglePanel(){
-  panelOpen = !panelOpen;
-  const wrap   = document.getElementById("panel-wrap");
-  const arrow  = document.getElementById("panel-toggle-arrow");
-  const hint   = document.getElementById("panel-toggle-hint");
-
-  if(panelOpen){
-    wrap.classList.remove("collapsed");
-    arrow.classList.add("up");
-    arrow.textContent = "▲";
-    hint.textContent  = "tap to collapse";
-  } else {
-    wrap.classList.add("collapsed");
-    arrow.classList.remove("up");
-    arrow.textContent = "▼";
-    hint.textContent  = "tap to expand";
-  }
+  panelOpen=!panelOpen;
+  const wrap =document.getElementById("panel-wrap");
+  const arrow=document.getElementById("panel-toggle-arrow");
+  const hint =document.getElementById("panel-toggle-hint");
+  if(panelOpen){wrap.classList.remove("collapsed");arrow.classList.add("up");arrow.textContent="▲";hint.textContent="tap to collapse";}
+  else{wrap.classList.add("collapsed");arrow.classList.remove("up");arrow.textContent="▼";hint.textContent="tap to expand";}
 }
-
-// Keyboard shortcut: Tab toggles panel
-// (added inside the keydown handler below)
 
 // ══════════════════════════════════════
 // KEYBOARD SHORTCUTS
 // ══════════════════════════════════════
-function openKbdGuide() { document.getElementById("kbd-guide").classList.remove("hide"); }
-function closeKbdGuide(){ document.getElementById("kbd-guide").classList.add("hide"); }
+function openKbdGuide(){document.getElementById("kbd-guide").classList.remove("hide");}
+function closeKbdGuide(){document.getElementById("kbd-guide").classList.add("hide");}
 
 function kbdToast(msg){
   const t=document.getElementById("kbd-toast");
-  t.textContent=msg; t.classList.add("show");
+  t.textContent=msg;t.classList.add("show");
   clearTimeout(kbdToast._timer);
   kbdToast._timer=setTimeout(()=>t.classList.remove("show"),1400);
 }
@@ -975,36 +979,20 @@ function kbdToast(msg){
 const ALGO_KEYS={"1":"bfs","2":"dfs","3":"bestfs","4":"ucs","5":"iddfs"};
 const LANG_CYCLE=["python","c","cpp"];
 
-document.addEventListener("keydown", e=>{
-  // Ignore when typing in input/textarea
-  if(["INPUT","TEXTAREA","SELECT"].includes(e.target.tagName)) return;
+document.addEventListener("keydown",e=>{
+  if(["INPUT","TEXTAREA","SELECT"].includes(e.target.tagName))return;
   const k=e.key;
-
-  // Tab — toggle panel
-  if(k==="Tab"){ e.preventDefault(); togglePanel(); kbdToast(panelOpen?"📖 Panel expanded":"📖 Panel collapsed"); return; }
-
-  // ? — guide
-  if(k==="?"){ e.preventDefault(); document.getElementById("kbd-guide").classList.toggle("hide"); return; }
-
-  // Esc — close guide or cancel edge
+  if(k==="Tab"){e.preventDefault();togglePanel();kbdToast(panelOpen?"📖 Panel expanded":"📖 Panel collapsed");return;}
+  if(k==="?"){e.preventDefault();document.getElementById("kbd-guide").classList.toggle("hide");return;}
   if(k==="Escape"){
-    if(!document.getElementById("kbd-guide").classList.contains("hide")){ closeKbdGuide(); return; }
-    if(mode==="graph"&&cgSrc){ cgSrc=null; drawCG(); kbdToast("❌ Edge cancelled"); return; }
-    if(!document.getElementById("edge-modal").classList.contains("hide")){ closeEM(); return; }
+    if(!document.getElementById("kbd-guide").classList.contains("hide")){closeKbdGuide();return;}
+    if(mode==="graph"&&cgSrc){cgSrc=null;drawCG();kbdToast("❌ Edge cancelled");return;}
+    if(!document.getElementById("edge-modal").classList.contains("hide")){closeEM();return;}
     return;
   }
-
-  // Algo select 1–5
-  if(ALGO_KEYS[k]){ selectAlgo(ALGO_KEYS[k]); kbdToast("Algorithm: "+ALGOS[ALGO_KEYS[k]].short); return; }
-
-  // G / C — mode switch
-  if(k==="g"||k==="G"){ setMode("grid");  kbdToast("⊞ Grid mode"); return; }
-  if(k==="c"||k==="C"){
-    // only switch if not typing
-    setMode("graph"); kbdToast("⬡ Custom Graph mode"); return;
-  }
-
-  // Language cycle — P
+  if(ALGO_KEYS[k]){selectAlgo(ALGO_KEYS[k]);kbdToast("Algorithm: "+ALGOS[ALGO_KEYS[k]].short);return;}
+  if(k==="g"||k==="G"){setMode("grid");kbdToast("⊞ Grid mode");return;}
+  if(k==="c"||k==="C"){setMode("graph");kbdToast("⬡ Custom Graph mode");return;}
   if(k==="p"||k==="P"){
     const i=LANG_CYCLE.indexOf(lang);
     lang=LANG_CYCLE[(i+1)%LANG_CYCLE.length];
@@ -1013,37 +1001,21 @@ document.addEventListener("keydown", e=>{
     kbdToast("Language: "+lang.charAt(0).toUpperCase()+lang.slice(1));
     return;
   }
-
-  // L — clear log
-  if(k==="l"||k==="L"){ clearLog(); kbdToast("🗑 Log cleared"); return; }
-
-  // GRID mode shortcuts
+  if(k==="l"||k==="L"){clearLog();kbdToast("🗑 Log cleared");return;}
   if(mode==="grid"){
-    if(k==="n"||k==="N"){ createGrid(); kbdToast("🔲 New grid"); return; }
-    if(k==="r"||k==="R"){ resetGrid();  kbdToast("🔄 Grid reset"); return; }
-    if(k===" "){
-      e.preventDefault();
-      if(running){ togglePause(); kbdToast(paused?"⏸ Paused":"▶ Resumed"); }
-      else{ runGrid(); kbdToast("▶ Running "+ALGOS[algo].short); }
-      return;
-    }
-    if(k==="ArrowRight"){ e.preventDefault(); doStep(); kbdToast("⏭ Step"); return; }
-    if(k==="e"||k==="E"){ gridToCustomGraph(); kbdToast("⬡ Exported to Graph"); return; }
+    if(k==="n"||k==="N"){createGrid();kbdToast("🔲 New grid");return;}
+    if(k==="r"||k==="R"){resetGrid();kbdToast("🔄 Grid reset");return;}
+    if(k===" "){e.preventDefault();if(running){togglePause();kbdToast(paused?"⏸ Paused":"▶ Resumed");}else{runGrid();kbdToast("▶ Running "+ALGOS[algo].short);}return;}
+    if(k==="ArrowRight"){e.preventDefault();doStep();kbdToast("⏭ Step");return;}
+    if(k==="e"||k==="E"){gridToCustomGraph();kbdToast("⬡ Exported to Graph");return;}
   }
-
-  // GRAPH mode shortcuts
   if(mode==="graph"){
-    if(k==="a"||k==="A"){ cgTool("node"); kbdToast("＋ Node tool"); return; }
-    if(k==="d"||k==="D"){ cgTool("edge"); kbdToast("⟶ Edge tool"); return; }
-    if(k==="t"||k==="T"){ openEM(); kbdToast("📝 Type edges"); return; }
-    if(k==="x"||k==="X"){ cgClear(); kbdToast("🗑 Graph cleared"); return; }
-    if(k===" "){
-      e.preventDefault();
-      if(cgRunning){ toggleCGPause(); kbdToast(cgPaused?"⏸ Paused":"▶ Resumed"); }
-      else{ runCG(); kbdToast("▶ Running "+ALGOS[algo].short); }
-      return;
-    }
-    if(k==="ArrowRight"){ e.preventDefault(); doCGStep(); kbdToast("⏭ Step"); return; }
+    if(k==="a"||k==="A"){cgTool("node");kbdToast("＋ Node tool");return;}
+    if(k==="d"||k==="D"){cgTool("edge");kbdToast("⟶ Edge tool");return;}
+    if(k==="t"||k==="T"){openEM();kbdToast("📝 Type edges");return;}
+    if(k==="x"||k==="X"){cgClear();kbdToast("🗑 Graph cleared");return;}
+    if(k===" "){e.preventDefault();if(cgRunning){toggleCGPause();kbdToast(cgPaused?"⏸ Paused":"▶ Resumed");}else{runCG();kbdToast("▶ Running "+ALGOS[algo].short);}return;}
+    if(k==="ArrowRight"){e.preventDefault();doCGStep();kbdToast("⏭ Step");return;}
   }
 });
 
@@ -1052,10 +1024,11 @@ document.addEventListener("keydown", e=>{
 // ══════════════════════════════════════
 window.addEventListener("resize",()=>{
   if(mode==="graph"){sizeCGCanvas();drawCG();}
-  if(gridArr&&gridEl){
+  if(gridArr){
     const s=cellSz();
     document.querySelectorAll(".cell").forEach(c=>{c.style.width=s+"px";c.style.height=s+"px";});
-    gridEl.style.gridTemplateColumns=`repeat(${COLS},${s}px)`;
+    const g=document.getElementById("grid");
+    if(g)g.style.gridTemplateColumns=`repeat(${COLS},${s}px)`;
   }
 });
 
@@ -1065,6 +1038,5 @@ window.addEventListener("DOMContentLoaded",()=>{
   createGrid();
   setStep(1);
   showGridHint();
-  // size canvas once layout is done
   setTimeout(()=>{sizeCGCanvas();},200);
 });
