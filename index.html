@@ -6,6 +6,61 @@
 <title>AlgoViz — Search Algorithm Visualizer</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+
+<!-- ── PANEL SECTION EXPAND/COLLAPSE ── -->
+<style>
+/* Arrow indicator on every panel section header */
+.ph .ps-arrow {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text3);
+  transition: transform .25s ease, color .2s;
+  flex-shrink: 0;
+  padding-left: 6px;
+}
+/* Collapsed state hides the body */
+.ps.ps-collapsed > *:not(.ph) {
+  display: none !important;
+}
+/* When collapsed, arrow points right */
+.ps.ps-collapsed .ps-arrow {
+  transform: rotate(-90deg);
+  color: var(--text3);
+}
+/* When expanded, arrow points down and glows */
+.ps:not(.ps-collapsed) .ps-arrow {
+  transform: rotate(0deg);
+  color: var(--cyan);
+}
+/* Clickable header feel */
+.ph {
+  cursor: pointer;
+  user-select: none;
+  transition: background .15s;
+}
+.ph:hover {
+  background: rgba(0, 247, 255, 0.05);
+}
+.ph:active {
+  background: rgba(0, 247, 255, 0.10);
+}
+/* ggPanel header also clickable */
+#ggPanel .ph {
+  cursor: pointer;
+  user-select: none;
+}
+#ggPanel.ps-collapsed > *:not(.ph) {
+  display: none !important;
+}
+#ggPanel.ps-collapsed .ps-arrow {
+  transform: rotate(-90deg);
+  color: var(--text3);
+}
+#ggPanel:not(.ps-collapsed) .ps-arrow {
+  transform: rotate(0deg);
+  color: var(--cyan);
+}
+</style>
 </head>
 <body>
 
@@ -85,7 +140,6 @@
 
   <!-- HINT BAR -->
   <div id="hintbar">
-    <!-- grid steps shown here, swapped to graph hint on mode change -->
     <div class="step on"   id="s1"><span class="snum">1</span><span>Click → <b>Start</b></span></div>
     <span class="sarr">→</span>
     <div class="step" id="s2"><span class="snum">2</span><span>Click → <b>Goal</b></span></div>
@@ -122,7 +176,7 @@
             </div>
           </div>
 
-          <!-- GRAPH VIEW (hidden by default) -->
+          <!-- GRAPH VIEW -->
           <div id="graph-view" style="display:none">
             <div id="cg-toolbar"><span id="cg-hint">⬡ Custom Graph — click to add nodes</span></div>
             <canvas id="cgCanvas"></canvas>
@@ -156,7 +210,7 @@
         <!-- RIGHT PANEL -->
         <div id="panel">
 
-          <!-- TOGGLE HEADER -->
+          <!-- WHOLE-PANEL TOGGLE (existing) -->
           <div id="panel-toggle" onclick="togglePanel()">
             <span id="panel-toggle-label">
               <span id="panel-toggle-arrow" class="up">▲</span>
@@ -168,29 +222,48 @@
           <!-- COLLAPSIBLE CONTENT -->
           <div id="panel-wrap">
 
-            <div class="ps">
-              <div class="ph"><span id="panel-title">📖 What is BFS?</span></div>
+            <!-- each .ps header is now clickable to expand/collapse that section -->
+
+            <div class="ps" id="ps-algo">
+              <div class="ph" onclick="togglePs('ps-algo')" title="Click to expand / collapse  |  Shortcut: O">
+                <span id="panel-title">📖 What is BFS?</span>
+                <span class="ps-arrow">▼</span>
+              </div>
               <div id="algo-info"></div>
             </div>
 
-            <div class="ps">
-              <div class="ph"><span>🧠 Thinking Panel</span><button onclick="clearLog()">Clear</button></div>
+            <div class="ps" id="ps-thinking">
+              <div class="ph" onclick="togglePs('ps-thinking')" title="Click to expand / collapse  |  Shortcut: O">
+                <span>🧠 Thinking Panel</span>
+                <span class="ps-arrow">▼</span>
+                <button onclick="event.stopPropagation();clearLog()" style="margin-left:8px">Clear</button>
+              </div>
               <div id="log"></div>
             </div>
 
-            <div class="ps">
-              <div class="ph"><span id="qlabel">📦 Queue (FIFO)</span></div>
+            <div class="ps" id="ps-queue">
+              <div class="ph" onclick="togglePs('ps-queue')" title="Click to expand / collapse  |  Shortcut: O">
+                <span id="qlabel">📦 Queue (FIFO)</span>
+                <span class="ps-arrow">▼</span>
+              </div>
               <div id="qdisplay"><span style="color:var(--text3);font-size:11px;padding:6px 10px;display:block">Run an algorithm to see queue state</span></div>
             </div>
 
-            <div class="ps">
-              <div class="ph"><span>💻 Code Trace</span></div>
+            <div class="ps" id="ps-code">
+              <div class="ph" onclick="togglePs('ps-code')" title="Click to expand / collapse  |  Shortcut: O">
+                <span>💻 Code Trace</span>
+                <span class="ps-arrow">▼</span>
+              </div>
               <div id="codePanel"></div>
               <div id="codeEx"></div>
             </div>
 
-            <div id="ggPanel">
-              <div class="ph"><span>🕸️ Grid→Graph View</span><button onclick="runGG()">▶ Run</button></div>
+            <div id="ggPanel" class="ps">
+              <div class="ph" onclick="togglePs('ggPanel')" title="Click to expand / collapse  |  Shortcut: O">
+                <span>🕸️ Grid→Graph View</span>
+                <span class="ps-arrow">▼</span>
+                <button onclick="event.stopPropagation();runGG()" style="margin-left:8px">▶ Run</button>
+              </div>
               <div style="padding:5px 12px;font-size:10px;color:var(--text3);border-bottom:1px solid var(--border)">Each dot = one cell. Lines = connections.</div>
               <canvas id="ggCanvas" width="300" height="180"></canvas>
             </div>
@@ -210,8 +283,8 @@
           <div class="card"><div class="cnum">02</div><h3>Grid Mode</h3><p>Type a grid size → <b>New Grid</b>. Click → <b>Start</b> (green). Click → <b>Goal</b> (red). More clicks → <b>Walls</b>. Then <b>▶ Run</b>.</p></div>
           <div class="card"><div class="cnum">03</div><h3>Custom Graph — Type</h3><p>Switch to <b>⬡ Custom Graph</b> → click <b>📝 Type Edges</b> → enter edges like <code>A-B</code> one per line → <b>Build Graph</b>.</p></div>
           <div class="card"><div class="cnum">04</div><h3>Custom Graph — Draw</h3><p>Use <b>＋ Node</b> to click and place nodes on the canvas. Use <b>⟶ Edge</b> to connect two nodes. Drag nodes to reposition.</p></div>
-          <div class="card"><div class="cnum">05</div><h3>Set Start & Goal</h3><p><b>Right-click</b> any node on the custom graph to open a menu. Choose <b>Set as Start</b> or <b>Set as Goal</b>. Then press <b>▶ Run</b>.</p></div>
-          <div class="card"><div class="cnum">06</div><h3>Pause & Step</h3><p>Hit <b>⏸ Pause</b> to freeze the animation. Then <b>⏭ Step</b> moves one action at a time — best way to learn what's happening.</p></div>
+          <div class="card"><div class="cnum">05</div><h3>Set Start &amp; Goal</h3><p><b>Right-click</b> any node on the custom graph to open a menu. Choose <b>Set as Start</b> or <b>Set as Goal</b>. Then press <b>▶ Run</b>.</p></div>
+          <div class="card"><div class="cnum">06</div><h3>Pause &amp; Step</h3><p>Hit <b>⏸ Pause</b> to freeze the animation. Then <b>⏭ Step</b> moves one action at a time — best way to learn what's happening.</p></div>
         </div>
         <div style="margin-bottom:16px"><h2 style="font-size:18px;font-weight:700;margin-bottom:14px">5 Algorithms — Plain English</h2></div>
         <div class="aecs">
@@ -258,9 +331,8 @@
 <!-- FLOATING ACTION BUTTON (mobile) -->
 <button id="fab" onclick="toggleFAB()" title="Quick actions">⚡</button>
 <div id="fab-backdrop" onclick="closeFAB()"></div>
-<div id="fab-menu" id="fab-menu">
+<div id="fab-menu">
 
-  <!-- RUN / PAUSE -->
   <div class="fab-item" onclick="fabRun()">
     <div class="fab-icon" style="background:rgba(0,247,255,.15);color:var(--cyan)">▶</div>
     <div><div class="fab-label">Run Algorithm</div><div class="fab-sub" id="fab-algo-name">BFS</div></div>
@@ -278,7 +350,6 @@
 
   <div class="fab-divider"></div>
 
-  <!-- GRID ACTIONS -->
   <div class="fab-item" id="fab-mode-item" onclick="fabToggleMode()">
     <div class="fab-icon" style="background:rgba(0,247,255,.1);color:var(--cyan)" id="fab-mode-icon">⬡</div>
     <div><div class="fab-label" id="fab-mode-label">Custom Graph</div><div class="fab-sub">Switch mode</div></div>
@@ -296,7 +367,6 @@
 
   <div class="fab-divider"></div>
 
-  <!-- PANEL + ALGO -->
   <div class="fab-item" onclick="togglePanel();closeFAB()">
     <div class="fab-icon" style="background:rgba(56,189,248,.15);color:var(--blue)">☰</div>
     <div><div class="fab-label" id="fab-panel-label">Collapse Panel</div><div class="fab-sub">More space for grid</div></div>
@@ -330,7 +400,8 @@
 
     <div class="kbd-section">
       <h3>GENERAL</h3>
-      <div class="kbd-row"><span><span class="kbd">Tab</span></span><span>Collapse / expand the panel section</span></div>
+      <div class="kbd-row"><span><span class="kbd">Tab</span></span><span>Collapse / expand the whole panel</span></div>
+      <div class="kbd-row"><span><span class="kbd">O</span></span><span>Cycle through panel sections (expand one at a time)</span></div>
       <div class="kbd-row"><span><span class="kbd">?</span></span><span>Open / close this shortcut guide</span></div>
       <div class="kbd-row"><span><span class="kbd">G</span></span><span>Switch to Grid mode</span></div>
       <div class="kbd-row"><span><span class="kbd">C</span></span><span>Switch to Custom Graph mode</span></div>
@@ -339,11 +410,16 @@
     </div>
 
     <div class="kbd-section">
+      <h3>PANEL SECTIONS  <span style="font-size:9px;color:var(--text3);font-weight:400">(tap header or use keyboard)</span></h3>
+      <div class="kbd-row"><span>Tap any panel header</span><span>Expand / collapse that section</span></div>
+      <div class="kbd-row"><span><span class="kbd">O</span></span><span>Cycle: Algorithm info → Thinking → Queue → Code → Graph view</span></div>
+    </div>
+
+    <div class="kbd-section">
       <h3>GRID MODE</h3>
       <div class="kbd-row"><span><span class="kbd">N</span></span><span>New Grid (uses current size input)</span></div>
       <div class="kbd-row"><span><span class="kbd">R</span></span><span>Reset Grid (clear all)</span></div>
       <div class="kbd-row"><span><span class="kbd">Space</span></span><span>▶ Run algorithm</span></div>
-      <div class="kbd-row"><span><span class="kbd">P</span></span><span>Pause / Resume animation</span></div>
       <div class="kbd-row"><span><span class="kbd">→</span></span><span>Step forward (when paused)</span></div>
       <div class="kbd-row"><span><span class="kbd">E</span></span><span>Export grid as Custom Graph (⬡ → Graph)</span></div>
     </div>
@@ -368,11 +444,12 @@
 
     <div class="kbd-section">
       <h3>TIPS</h3>
-      <div class="kbd-row"><span>Right-click node</span><span>Set as Start / Goal / Delete</span></div>
+      <div class="kbd-row"><span>Right-click / long-press node</span><span>Set as Start / Goal / Delete</span></div>
       <div class="kbd-row"><span>Click edge (⟶ tool)</span><span>Edit edge weight</span></div>
       <div class="kbd-row"><span>Drag node</span><span>Reposition on canvas</span></div>
       <div class="kbd-row"><span>Type <code style="background:var(--bg3);padding:1px 5px;border-radius:4px;font-family:var(--fm);color:var(--cyan);font-size:11px">A-B:3</code></span><span>Edge with weight 3 in text input</span></div>
     </div>
+
   </div>
 </div>
 
@@ -381,5 +458,55 @@
 
 <script src="script.js"></script>
 <script src="allpaths.js"></script>
+
+<!-- ── PANEL SECTION TOGGLE ── -->
+<!-- Added as a separate inline script so script.js is untouched -->
+<script>
+// IDs of the panel sections in order
+const PS_IDS = ['ps-algo', 'ps-thinking', 'ps-queue', 'ps-code', 'ggPanel'];
+
+/**
+ * Toggle a single panel section open/closed.
+ * @param {string} id  — the id of the .ps element
+ */
+function togglePs(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle('ps-collapsed');
+  const arrow = el.querySelector('.ps-arrow');
+  // arrow direction handled purely by CSS class, but update title hint
+  const collapsed = el.classList.contains('ps-collapsed');
+  kbdToast(collapsed ? '📕 Section collapsed' : '📖 Section expanded');
+}
+
+/**
+ * Cycle through panel sections with the O key:
+ * — collapses all, then expands the next one in the list.
+ * — if none are open, opens the first one.
+ */
+function cyclePanelSection() {
+  // find which is currently the ONLY expanded one (or last expanded)
+  const sections = PS_IDS.map(id => document.getElementById(id)).filter(Boolean);
+  // find first expanded
+  let openIdx = sections.findIndex(s => !s.classList.contains('ps-collapsed'));
+  // collapse all
+  sections.forEach(s => s.classList.add('ps-collapsed'));
+  // open next
+  const nextIdx = openIdx === -1 ? 0 : (openIdx + 1) % sections.length;
+  sections[nextIdx].classList.remove('ps-collapsed');
+  const name = sections[nextIdx].querySelector('.ph span')?.textContent?.trim() || '';
+  kbdToast('📖 ' + name);
+}
+
+// Hook O key into the existing keydown listener
+// We do this by adding another listener — does not touch script.js
+document.addEventListener('keydown', function(e) {
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+  if (e.key === 'o' || e.key === 'O') {
+    cyclePanelSection();
+  }
+});
+</script>
+
 </body>
 </html>
