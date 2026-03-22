@@ -64,6 +64,7 @@
         <button onclick="createGrid()">🔲 New Grid</button>
         <button onclick="resetGrid()">🔄 Reset</button>
         <button class="brun" onclick="runGrid()">▶ Run</button>
+        <button onclick="findAllPaths()">🔀 All Paths</button>
         <button id="bPause" onclick="togglePause()" disabled>⏸ Pause</button>
         <button id="bStep"  onclick="doStep()"      disabled>⏭ Step</button>
         <button onclick="gridToCustomGraph()" title="Convert grid to editable custom graph" style="border-color:#a78bfa;color:#a78bfa">⬡ → Graph</button>
@@ -75,6 +76,7 @@
         <button id="btnEdge" class="mbtn"    onclick="cgTool('edge')">⟶ Edge</button>
         <button onclick="openEM()">📝 Type Edges</button>
         <button class="brun" onclick="runCG()">▶ Run</button>
+        <button onclick="findAllPaths()">🔀 All Paths</button>
         <button id="bGPause" onclick="toggleCGPause()" disabled>⏸ Pause</button>
         <button id="bGStep"  onclick="doCGStep()"      disabled>⏭ Step</button>
       </span>
@@ -378,5 +380,6 @@
 <div id="kbd-toast"></div>
 
 <script src="script.js"></script>
+<script src="allpaths.js"></script>
 </body>
 </html>
